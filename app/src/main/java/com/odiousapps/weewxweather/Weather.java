@@ -12,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.android.material.checkbox.MaterialCheckBox;
+import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.textview.MaterialTextView;
 
 import java.time.Duration;
@@ -43,6 +44,9 @@ public class Weather extends Fragment implements View.OnClickListener
 	private LinearLayout fll;
 	private MainActivity activity;
 	private MaterialTextView tv1, tv2;
+
+	private ChipGroup forecastIntervalGroup;
+	private int intervalHours = 0;
 
 	private boolean current_refreshed = true;
 	private boolean forecast_refresh = true;
@@ -96,6 +100,22 @@ public class Weather extends Fragment implements View.OnClickListener
 
 		boolean disableSwipeOnRadar = (boolean)KeyValue.readVar("disableSwipeOnRadar", weeWXApp.disableSwipeOnRadar_default);
 		floatingCheckBox.setChecked(disableSwipeOnRadar);
+
+		forecastIntervalGroup = rootView.findViewById(R.id.forecastIntervalGroup);
+		forecastIntervalGroup.check(R.id.chipDaily);
+		forecastIntervalGroup.setOnCheckedStateChangeListener((group, checkedIds) ->
+		{
+			if(!checkedIds.isEmpty())
+			{
+				int checkedId = checkedIds.get(0);
+				if(checkedId == R.id.chipHourly) intervalHours = 1;
+				else if(checkedId == R.id.chip3h) intervalHours = 3;
+				else if(checkedId == R.id.chip6h) intervalHours = 6;
+				else if(checkedId == R.id.chip12h) intervalHours = 12;
+				else intervalHours = 0;
+				loadWebView();
+			}
+		});
 
 		swipeLayout.setRefreshing(true);
 
@@ -984,12 +1004,12 @@ public class Weather extends Fragment implements View.OnClickListener
 		final StringBuilder sb = new StringBuilder();
 
 		sb.append(weeWXApp.current_html_headers)
-				.append(weeWXApp.script_header)
-				.append(weeWXApp.html_header_rest)
-				.append(weeWXApp.inline_arrow);
+				.append(weeWXApp.html_header_rest);
 
 		if(radarForecast == weeWXApp.RadarOnHomeScreen)
 		{
+			forecastIntervalGroup.post(() -> forecastIntervalGroup.setVisibility(View.GONE));
+
 			String radtype = (String)KeyValue.readVar("radtype", weeWXApp.radtype_default);
 			String radarURL = (String)KeyValue.readVar("RADAR_URL", "");
 
@@ -1028,10 +1048,14 @@ public class Weather extends Fragment implements View.OnClickListener
 			if(fctype == null || fctype.isBlank())
 			{
 				LogMessage("Weather.loadWebView() forecast type is invalid: " + fctype, true, KeyValue.w);
+				forecastIntervalGroup.post(() -> forecastIntervalGroup.setVisibility(View.GONE));
 				String finalErrorStr = String.format(weeWXApp.getAndroidString(R.string.forecast_type_is_invalid), fctype);
 				loadWebViewContent(finalErrorStr);
 				return;
 			}
+
+			boolean hasIntervals = fctype.equals("met.no");
+			forecastIntervalGroup.post(() -> forecastIntervalGroup.setVisibility(hasIntervals ? View.VISIBLE : View.GONE));
 
 			String forecastGson = (String)KeyValue.readVar("forecastGsonEncoded", "");
 			boolean hasForecastGson = forecastGson != null && forecastGson.length() > 128;
@@ -1061,7 +1085,7 @@ public class Weather extends Fragment implements View.OnClickListener
 				extSVG = "_dark.svg";
 			}
 
-			String[] content = weeWXAppCommon.getGsonContent(forecastGson, false);
+			String[] content = weeWXAppCommon.getGsonContent(forecastGson, false, hasIntervals ? intervalHours : 0);
 			if(content.length < 2)
 			{
 				LogMessage("Weather.loadWebView() forecastGson is null or blank, " +

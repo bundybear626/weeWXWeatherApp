@@ -50,59 +50,10 @@ public class weeWXApp extends Application
 			<meta name='color-scheme' content='light dark'>
 	""";
 
-	static final String script_header = """
-			<script>
-				document.addEventListener("DOMContentLoaded", function()
-				{
-					const btn = document.getElementById("scrollToTop");
-
-					window.addEventListener("scroll", () =>
-					{
-						// At the top? Hide the button
-						if(document.documentElement.scrollTop > 100)
-							btn.classList.add("show");
-						else
-							btn.classList.remove("show");
-					});
-
-					btn.addEventListener("click", () =>
-					{
-						window.scrollTo(
-						{
-							top: 0,
-							behavior: "smooth"
-						});
-					});
-				});
-			</script>
-	""";
-
 	static final String html_header_rest = """
 		</head>
 		<body>
 	""";
-
-	private static final String inline_arrow_light = """
-			<!-- Floating scroll-to-top button -->
-			<div id="scrollToTop">
-				<svg viewBox="0 0 24 24">
-					<path fill="#fff"
-					      d="M12 4l-7 8h4v8h6v-8h4z"/>
-				</svg>
-			</div>
-	""";
-
-	private static final String inline_arrow_dark = """
-			<!-- Floating scroll-to-top button -->
-			<div id="scrollToTop">
-				<svg viewBox="0 0 24 24">
-					<path fill="#000"
-					      d="M12 4l-7 8h4v8h6v-8h4z"/>
-				</svg>
-			</div>
-	""";
-
-	static String inline_arrow = inline_arrow_light;
 
 	static final String html_footer = """
 		</body>
@@ -214,7 +165,6 @@ public class weeWXApp extends Application
 	final static int widgetFG_default2 = 0xFF000000;
 
 	final static int updateInterval_default = 1;
-	final static int mySlider_default = 100;
 	final static int DayNightMode_default = 2;
 	final static int widget_theme_mode_default = 4;
 	final static int theme_default = R.style.AppTheme_weeWXApp_Light_Common;
@@ -359,6 +309,15 @@ public class weeWXApp extends Application
 			LogMessage("weeWXApp.java successfully converted preference object types...", KeyValue.d);
 		else
 			LogMessage("weeWXApp.java didn't need to convert preference object types...", KeyValue.d);
+
+		// Purge cached forecast data if it contains stale unit strings (e.g. "kph" from old builds).
+		// This handles Android Auto Backup restoring old cached data after a reinstall.
+		String cachedGson = (String)KeyValue.readVar("forecastGsonEncoded", "");
+		if(cachedGson != null && cachedGson.contains("kph"))
+		{
+			LogMessage("weeWXApp.java purging stale forecastGsonEncoded (contained old unit strings)...", KeyValue.i);
+			KeyValue.putVar("forecastGsonEncoded", null);
+		}
 
 		colours = new Colours();
 
@@ -563,15 +522,6 @@ public class weeWXApp extends Application
 		}
 
 		String main_css = loadFileFromAssets("main.css");
-		if(main_css != null && !main_css.isBlank())
-		{
-			if(theme == R.style.AppTheme_weeWXApp_Light_Common)
-				main_css = main_css.replace("ARROW_COLOUR", "#fff")
-						.replace("ARROW_BG_COLOUR", "#333");
-			else
-				main_css = main_css.replace("ARROW_COLOUR", "#000000")
-						.replace("ARROW_BG_COLOUR", "#CCCCCC");
-		}
 
 		current_html_headers = html_header +
 		                       "<style>\n" +
@@ -583,11 +533,6 @@ public class weeWXApp extends Application
 		                      loadFileFromAssets("secondary.css") +
 		                      "\n</style>\n" +
 		                      dialog_html_header_rest;
-
-		if(theme == R.style.AppTheme_weeWXApp_Light_Common)
-			inline_arrow = inline_arrow_light;
-		else
-			inline_arrow = inline_arrow_dark;
 
 		replaceHex6String("BG_HEX", colours.bgColour);
 		replaceHex6String("FG_HEX", colours.fgColour);

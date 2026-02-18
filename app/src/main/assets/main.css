@@ -371,34 +371,3 @@ html, body
         align-items: center;
 	}
 }
-/* Scroll-to-top button */
-#scrollToTop
-{
-	position: fixed;
-	bottom: 20px;
-	left: 20px;
-	width: 48px;
-	height: 48px;
-	background: ARROW_BG_COLOUR;
-	color: ARROW_COLOUR;
-	border-radius: 50%;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	cursor: pointer;
-	opacity: 0;
-	pointer-events: none;
-	transition: opacity 0.25s ease;
-	z-index: 999;
-}
-#scrollToTop.show
-{
-	opacity: 0.9;
-	pointer-events: auto;
-}
-#scrollToTop svg
-{
-	width: 24px;
-	height: 24px;
-	fill: #fff;
-}

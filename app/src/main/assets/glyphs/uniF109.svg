@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Water droplet outline ring (even-odd creates hollow center) -->
+  <path fill="currentColor" fill-rule="evenodd" d="M50,5 C50,5 15,42 15,65 A35,35 0 0,0 85,65 C85,42 50,5 50,5Z M50,17 C50,17 24,47 24,65 A26,26 0 0,0 76,65 C76,47 50,17 50,17Z"/>
+  <!-- Thermometer (rounded-top stem + bulb) -->
+  <path fill="currentColor" d="M54,30 C54,27.8 52.2,26 50,26 C47.8,26 46,27.8 46,30 L46,57 C42.8,58.8 41,62 41,65.5 C41,71.3 45,76 50,76 C55,76 59,71.3 59,65.5 C59,62 57.2,58.8 54,57 Z"/>
+</svg>

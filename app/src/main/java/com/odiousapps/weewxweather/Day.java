@@ -8,6 +8,8 @@ class Day
 	String text = "";
 	String max = "";
 	String min = "";
+	String rainfall = "";
+	String instantTemp = "";
 	long timestamp = 0;
 
 	@NonNull

@@ -899,20 +899,25 @@ class weeWXAppCommon
 
 			sb.append("\t\t\t<div class='smallTemp'>\n");
 			sb.append("\t\t\t\t<div class='forecastMax'>");
-			if(day.max.equals("&deg;C") || day.max.equals("&deg;F"))
+			String displayTemp = (intervalHours == 1 && !day.instantTemp.isBlank()) ? day.instantTemp : day.max;
+			if(displayTemp.isBlank() || displayTemp.equals("&deg;C") || displayTemp.equals("&deg;F"))
 				sb.append("N/A");
 			else
-				sb.append(day.max);
+				sb.append(displayTemp);
 			sb.append("</div>\n");
 
-			sb.append("\t\t\t\t<div class='forecastMin'>");
-			if(day.min.equals("&deg;C") || day.min.equals("&deg;F"))
-				sb.append("N/A");
-			else
-				sb.append(day.min);
-			sb.append("</div>\n\t\t\t</div>\n\t\t</div>\n");
+			if(intervalHours != 1 && !day.min.isBlank() && !day.min.equals("&deg;C") && !day.min.equals("&deg;F"))
+				sb.append("\t\t\t\t<div class='forecastMin'>").append(day.min).append("</div>\n");
+
+			sb.append("\t\t\t</div>\n\t\t</div>\n");
 
 			sb.append("\t\t<div class='desc'>\n\t\t\t");
+			if(!day.rainfall.isBlank())
+			{
+				sb.append(day.rainfall).append(" rain");
+				if(!day.text.isBlank())
+					sb.append(" | ");
+			}
 			sb.append(day.text).append("\n\t\t</div>\n");
 
 			if(i < days.size() - 1)
@@ -1973,24 +1978,101 @@ class weeWXAppCommon
 					updateCacheTime(timestamp);
 			}
 
+			// For the true overnight low we need two preceding 6h blocks (complete API has next_6h max/min):
+			// T12:00:00Z UTC (10pm AEST) next_6h covers 10pm→4am AEST
+			// T18:00:00Z UTC ( 4am AEST) next_6h covers  4am→10am AEST
+			// True overnight low = min of both those next_6h.air_temperature_min values.
+			JSONObject prevNoonEntry = null;   // last T12:00:00Z seen
+			JSONObject prevSixPMEntry = null;  // last T18:00:00Z seen
+
 			for(int i = 0; i < timeseries.length(); i++)
 			{
 				JSONObject jobj2 = timeseries.getJSONObject(i);
 				String time = jobj2.getString("time");
 				boolean isMidnight = time.endsWith("T00:00:00Z");
+				boolean isNoon = time.endsWith("T12:00:00Z");
+				boolean isSixPM = time.endsWith("T18:00:00Z");
 
 				// Build hourly entry (prefer next_1_hours rain) for allEntries
 				Day hourlyDay = buildMetNODay(jobj2, metric, rainInInches, true);
 				if(hourlyDay != null)
 					allEntries.add(hourlyDay);
 
-				// Build daily entry (use next_6_hours rain) for days list
+				// Build daily entry at midnight UTC (= 10am AEST)
 				if(i == 0 || isMidnight)
 				{
 					Day dailyDay = buildMetNODay(jobj2, metric, rainInInches, false);
 					if(dailyDay != null)
+					{
+						// For i==0 entries that are not 6h-aligned, next_6_hours is absent so
+						// buildMetNODay() falls back to instant temp for max. Scan ahead (up to
+						// 6 entries) for the next 6h-aligned entry to get period max/min.
+						if(i == 0 && !isMidnight && !dailyDay.instantTemp.isBlank()
+								&& dailyDay.max.equals(dailyDay.instantTemp))
+						{
+							for(int j = 1; j <= 6 && j < timeseries.length(); j++)
+							{
+								try
+								{
+									JSONObject futureEntry = timeseries.getJSONObject(j);
+									JSONObject futureData = futureEntry.getJSONObject("data");
+									if(futureData.has("next_6_hours"))
+									{
+										JSONObject n6 = futureData.getJSONObject("next_6_hours")
+												.getJSONObject("details");
+										if(n6.has("air_temperature_max"))
+										{
+											double tmax = n6.getDouble("air_temperature_max");
+											if(metric)
+												dailyDay.max = round(tmax, 1) + "&deg;C";
+											else
+												dailyDay.max = C2Fdeg((float)tmax);
+										}
+										if(n6.has("air_temperature_min") && dailyDay.min.isBlank())
+										{
+											double tmin = n6.getDouble("air_temperature_min");
+											if(metric)
+												dailyDay.min = round(tmin, 1) + "&deg;C";
+											else
+												dailyDay.min = C2Fdeg((float)tmin);
+										}
+										break;
+									}
+								} catch(Exception ignored) {}
+							}
+						}
+
+						// Override min with true overnight low from the two preceding 6h blocks.
+						// Take the minimum of both blocks' next_6h.air_temperature_min.
+						if(isMidnight)
+						{
+							double overnightMin = Double.MAX_VALUE;
+							for(JSONObject prevEntry : new JSONObject[]{prevNoonEntry, prevSixPMEntry})
+							{
+								if(prevEntry == null) continue;
+								try
+								{
+									JSONObject n6 = prevEntry.getJSONObject("data")
+											.getJSONObject("next_6_hours")
+											.getJSONObject("details");
+									if(n6.has("air_temperature_min"))
+										overnightMin = Math.min(overnightMin, n6.getDouble("air_temperature_min"));
+								} catch(Exception ignored) {}
+							}
+							if(overnightMin < Double.MAX_VALUE)
+							{
+								if(metric)
+									dailyDay.min = round(overnightMin, 1) + "&deg;C";
+								else
+									dailyDay.min = C2Fdeg((float)overnightMin);
+							}
+						}
 						days.add(dailyDay);
+					}
 				}
+
+				if(isNoon)   prevNoonEntry = jobj2;
+				if(isSixPM)  prevSixPMEntry = jobj2;
 			}
 		} catch(Exception e) {
 			doStackOutput(e);
@@ -2027,43 +2109,87 @@ class weeWXAppCommon
 					icon = tsdata.getJSONObject("next_1_hours").getJSONObject("summary").getString("symbol_code");
 			}
 
-			// Temperature from instant data (compact API doesn't have air_temperature_max)
+			// Instant temperature — always available, used as display temp for hourly and as fallback
 			JSONObject instant = tsdata.getJSONObject("instant").getJSONObject("details");
 			if(instant.has("air_temperature"))
 			{
-				day.max = instant.getDouble("air_temperature") + "&deg;C";
-				if(!metric)
-					day.max = C2Fdeg(Float.parseFloat(day.max));
+				double t = instant.getDouble("air_temperature");
+				if(metric)
+					day.instantTemp = round(t, 1) + "&deg;C";
+				else
+					day.instantTemp = C2Fdeg((float)t);
+				day.max = day.instantTemp; // fallback if no period max/min available
 			}
 
-			// Rain - prefer next_1_hours for short intervals, next_6_hours for daily
-			boolean gotRain = false;
-			if(preferShortInterval && tsdata.has("next_1_hours"))
+			// Max/min temps — prefer next_12_hours, fall back to next_6_hours
+			boolean gotMaxMin = false;
+			if(tsdata.has("next_12_hours"))
+			{
+				try
+				{
+					JSONObject n12 = tsdata.getJSONObject("next_12_hours").getJSONObject("details");
+					if(n12.has("air_temperature_max") && n12.has("air_temperature_min"))
+					{
+						double tmax = n12.getDouble("air_temperature_max");
+						double tmin = n12.getDouble("air_temperature_min");
+						if(metric)
+						{
+							day.max = round(tmax, 1) + "&deg;C";
+							day.min = round(tmin, 1) + "&deg;C";
+						} else {
+							day.max = C2Fdeg((float)tmax);
+							day.min = C2Fdeg((float)tmin);
+						}
+						gotMaxMin = true;
+					}
+				} catch(Exception ignored) {}
+			}
+
+			if(!gotMaxMin && tsdata.has("next_6_hours"))
+			{
+				try
+				{
+					JSONObject n6 = tsdata.getJSONObject("next_6_hours").getJSONObject("details");
+					if(n6.has("air_temperature_max") && n6.has("air_temperature_min"))
+					{
+						double tmax = n6.getDouble("air_temperature_max");
+						double tmin = n6.getDouble("air_temperature_min");
+						if(metric)
+						{
+							day.max = round(tmax, 1) + "&deg;C";
+							day.min = round(tmin, 1) + "&deg;C";
+						} else {
+							day.max = C2Fdeg((float)tmax);
+							day.min = C2Fdeg((float)tmin);
+						}
+					}
+				} catch(Exception ignored) {}
+			}
+
+			// Rainfall — prefer next_1_hours, fall back to next_6_hours
+			if(tsdata.has("next_1_hours"))
 			{
 				try
 				{
 					JSONObject details = tsdata.getJSONObject("next_1_hours").getJSONObject("details");
 					double precip = details.getDouble("precipitation_amount");
 					if(!metric || rainInInches)
-						day.min = round(precip / 25.4, 1) + "in";
+						day.rainfall = round(precip / 25.4, 2) + "in";
 					else
-						day.min = precip + "mm";
-					gotRain = true;
+						day.rainfall = precip + "mm";
 				} catch(Exception ignored) {}
 			}
 
-			if(!gotRain && tsdata.has("next_6_hours"))
+			if(day.rainfall.isBlank() && tsdata.has("next_6_hours"))
 			{
-				JSONObject details = tsdata.getJSONObject("next_6_hours")
-						.getJSONObject("details");
-
 				try
 				{
+					JSONObject details = tsdata.getJSONObject("next_6_hours").getJSONObject("details");
 					double precip = details.getDouble("precipitation_amount");
 					if(!metric || rainInInches)
-						day.min = round(precip / 25.4, 1) + "in";
+						day.rainfall = round(precip / 25.4, 2) + "in";
 					else
-						day.min = precip + "mm";
+						day.rainfall = precip + "mm";
 				} catch(Exception ignored) {}
 			}
 
@@ -2075,7 +2201,7 @@ class weeWXAppCommon
 				double windDir = details2.getDouble("wind_from_direction");
 
 				if(metric)
-					day.text = Math.round(windSpeed * 3.6) + "kph from the " + degtoname(windDir);
+					day.text = Math.round(windSpeed * 3.6) + "km/h from the " + degtoname(windDir);
 				else
 					day.text = Math.round(windSpeed * 2.236936) + "mph from the " + degtoname(windDir);
 			}
@@ -2951,7 +3077,8 @@ class weeWXAppCommon
 
 		try(Response response = client.newCall(request).execute())
 		{
-			String bodyStr = response.body().string();
+			okhttp3.ResponseBody rb = response.body();
+			String bodyStr = rb != null ? rb.string() : "";
 
 			LogMessage("response: " + response);
 			//LogMessage("Returned string: " + bodyStr);
@@ -3025,7 +3152,8 @@ class weeWXAppCommon
 
 		try(Response response = client.newCall(request).execute())
 		{
-			String bodyStr = response.body().string();
+			okhttp3.ResponseBody rb = response.body();
+			String bodyStr = rb != null ? rb.string() : "";
 			if(response.isSuccessful())
 			{
 				LogMessage("reallyDownloadString(url, args) Successfully uploaded something... response: " + bodyStr);
@@ -4654,6 +4782,7 @@ class weeWXAppCommon
 			case "flaticon-cool" -> tmpImg = "glyphs/uniF106.svg";
 			case "flaticon-cold" -> tmpImg = "glyphs/uniF107.svg";
 			case "flaticon-warm" -> tmpImg = "glyphs/uniF108.svg";
+			case "flaticon-dewpoint" -> tmpImg = "glyphs/uniF109.svg";
 			default -> LogMessage("Invalid FlatIcon String: " + cssname, true, KeyValue.w);
 		}
 

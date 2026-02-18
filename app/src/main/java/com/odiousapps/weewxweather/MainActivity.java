@@ -1413,7 +1413,7 @@ public class MainActivity extends FragmentActivity
 
 							if(lat != 0 && lon != 0)
 							{
-								forecastURL = "https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=" + lat + "&lon=" + lon;
+								forecastURL = "https://api.met.no/weatherapi/locationforecast/2.0/complete?lat=" + lat + "&lon=" + lon;
 
 								String url = "https://odiousapps.com/get-location-name-by-ll.php";
 

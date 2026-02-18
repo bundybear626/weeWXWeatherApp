@@ -24,10 +24,6 @@
 			android:layout_height="wrap_content"
 			android:gravity="center"/>
 
-		<com.google.android.material.slider.Slider
-			style="@style/Widget.weeWXApp.Slider"
-			android:id="@+id/pageZoom" />
-
 		<FrameLayout
 			android:id="@+id/webViewFrameLayout"
 			android:layout_width="match_parent"

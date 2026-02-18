@@ -1,8 +1,6 @@
 package com.odiousapps.weewxweather;
 
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,8 +9,6 @@ import android.view.ViewTreeObserver;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-
-import com.google.android.material.slider.Slider;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -24,8 +20,6 @@ import static com.odiousapps.weewxweather.weeWXAppCommon.LogMessage;
 
 public class Stats extends Fragment
 {
-	private Slider mySlider;
-	private int currZoom = 0;
 	private View rootView;
 	private SafeWebView wv;
 	private SwipeRefreshLayout swipeLayout;
@@ -51,21 +45,6 @@ public class Stats extends Fragment
 			weeWXAppCommon.getWeather(true, false, false);
 		});
 
-		mySlider = rootView.findViewById(R.id.pageZoom);
-		mySlider.setBackgroundColor(bgColour);
-		mySlider.addOnChangeListener((slider, value, fromUser) ->
-		{
-			LogMessage("Current Slider zoom = " + (int)mySlider.getValue() + "%");
-			LogMessage("New Slider zoom = " + value + "%");
-
-			if(fromUser && currZoom != (int)value)
-			{
-				currZoom = (int)value;
-				KeyValue.putVar("mySlider", currZoom);
-				setZoom(currZoom, true);
-			}
-		});
-
 		if(wv == null)
 			wv = weeWXApp.getInstance().wvpl.getWebView();
 
@@ -81,14 +60,6 @@ public class Stats extends Fragment
 		wv.setOnPageFinishedListener((v, url) ->
 		{
 			LogMessage("Stats.setOnPageFinishedListener()");
-
-			if(currZoom == 0)
-			{
-				currZoom = sanitiseZoom((int)KeyValue.readVar("mySlider", weeWXApp.mySlider_default));
-				LogMessage("Stats.setOnPageFinishedListener() currZoom: " + currZoom + "%", KeyValue.d);
-				wv.postDelayed(() -> setZoom(currZoom, false), 50);
-			}
-
 			stopRefreshing();
 		}, false);
 
@@ -100,17 +71,6 @@ public class Stats extends Fragment
 		weeWXAppCommon.NotificationManager.getNotificationLiveData().observe(getViewLifecycleOwner(), notificationObserver);
 
 		return rootView;
-	}
-
-	public void onResume()
-	{
-		super.onResume();
-
-		currZoom = sanitiseZoom((int)KeyValue.readVar("mySlider", weeWXApp.mySlider_default));
-
-		LogMessage("Stats.onResume() currZoom: " + currZoom + "%", KeyValue.d);
-
-		wv.postDelayed(() -> setZoom(currZoom, false), 50);
 	}
 
 	@Override
@@ -141,105 +101,6 @@ public class Stats extends Fragment
 			return;
 
 		swipeLayout.post(() -> swipeLayout.setRefreshing(false));
-	}
-
-	int sanitiseZoom(int zoom)
-	{
-		//zoom = Math.round(Math.round(zoom * 10.0f) * 10.0f);
-
-		if(zoom < 50)
-			zoom = 100;
-
-		if(zoom > 199)
-			zoom = 100;
-
-		return zoom;
-	}
-
-	void setZoom(int zoom, boolean fromUser)
-	{
-		if(mySlider == null || wv == null)
-			return;
-
-		if(!fromUser && (int)mySlider.getValue() == zoom)
-			return;
-
-		final int finalZoom = sanitiseZoom(zoom);
-		final float finalZoomDec = finalZoom / 100.0f;
-
-		String jsCommon = """
-			(function()
-			{
-				if (!document || !document.body || !document.body.style) return -1;
-
-			""";
-
-		String jsBottom = "})();";
-
-		String js1 = jsCommon + "var z = window.getComputedStyle(document.body).zoom;" +
-		                        "return z ? z : -1;" + jsBottom;
-
-		LogMessage("Get Zoom JS: " + js1.replaceAll("[\n\r\t]", " ")
-				.replaceAll("\\s+", " "), KeyValue.d);
-
-		String js2 = jsCommon + "document.body.style.zoom = " + finalZoomDec + "; return 'OK';" + jsBottom;
-
-		LogMessage("Set Zoom JS: " + js2.replaceAll("[\n\r\t]", " ")
-				.replaceAll("\\s+", " "), KeyValue.d);
-
-		Handler handler = new Handler(Looper.getMainLooper());
-		Runnable poll = new Runnable()
-		{
-			@Override
-			public void run()
-			{
-			    wv.evaluateJavascript(js1, value1 ->
-			    {
-					LogMessage("value1: " + value1, KeyValue.i);
-
-				    if(value1 == null || value1.isBlank() || value1.equals("null") || value1.equals("-1"))
-				    {
-						handler.postDelayed(this, 150);
-						return;
-				    }
-
-					Float f = weeWXAppCommon.str2Float(value1);
-					if(f == null)
-					{
-						LogMessage("f is null!", KeyValue.i);
-
-						handler.postDelayed(this, 150);
-						return;
-					}
-
-					LogMessage("f: " + f + ", finalZoomDec: " + finalZoomDec, KeyValue.i);
-
-					if(f == finalZoomDec)
-					{
-						LogMessage("Current page zoom: " + finalZoom + "%, no change required", KeyValue.d);
-						mySlider.setValue(finalZoom);
-						return;
-					}
-
-				    wv.post(() -> wv.evaluateJavascript(js2, value2 ->
-				    {
-						LogMessage("Stats.evaluateJavascript() returned value: " + value2);
-						if(!value2.equals("\"OK\""))
-					    {
-						    LogMessage("value != OK: " + value2);
-
-							handler.postDelayed(this, 150);
-							return;
-					    }
-
-						LogMessage("New zoom set to value: " + finalZoom + "%", KeyValue.d);
-					    mySlider.setValue(finalZoom);
-				    }));
-			    });
-		    }
-		};
-
-		handler.post(poll);
 	}
 
 	private final Observer<String> notificationObserver = str ->
@@ -507,8 +368,8 @@ public class Stats extends Fragment
 				convert(weeWXAppCommon.getElement(bits, 2)),
 				weeWXAppCommon.getElement(bits, 1) + weeWXAppCommon.getElement(bits, 60)));
 
-		sb.append(createRow(weeWXAppCommon.cssToSVG("wi-raindrop"),
-				weeWXAppCommon.cssToSVG("wi-raindrop"),
+		sb.append(createRow(weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
+				weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
 				weeWXAppCommon.getElement(bits, 15) + weeWXAppCommon.getElement(bits, 60),
 				convert(weeWXAppCommon.getElement(bits, 16)),
 				convert(weeWXAppCommon.getElement(bits, 14)),
@@ -572,7 +433,7 @@ public class Stats extends Fragment
 				convert(weeWXAppCommon.getElement(bits, 66)),
 				weeWXAppCommon.getElement(bits, 65) + weeWXAppCommon.getElement(bits, 60)));
 
-		sb.append(createRow(weeWXAppCommon.cssToSVG("wi-raindrop"), weeWXAppCommon.cssToSVG("wi-raindrop"),
+		sb.append(createRow(weeWXAppCommon.fiToSVG("flaticon-dewpoint"), weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
 				weeWXAppCommon.getElement(bits, 78) + weeWXAppCommon.getElement(bits, 60),
 				convert(weeWXAppCommon.getElement(bits, 79)),
 				convert(weeWXAppCommon.getElement(bits, 77)),
@@ -634,7 +495,7 @@ public class Stats extends Fragment
 				getTimeMonth(weeWXAppCommon.getElement(bits, 89)),
 				weeWXAppCommon.getElement(bits, 88) + weeWXAppCommon.getElement(bits, 60)));
 
-		sb.append(createRow(weeWXAppCommon.cssToSVG("wi-raindrop"), weeWXAppCommon.cssToSVG("wi-raindrop"),
+		sb.append(createRow(weeWXAppCommon.fiToSVG("flaticon-dewpoint"), weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
 				weeWXAppCommon.getElement(bits, 101) + weeWXAppCommon.getElement(bits, 60),
 				getTimeMonth(weeWXAppCommon.getElement(bits, 102)),
 				getTimeMonth(weeWXAppCommon.getElement(bits, 100)),
@@ -685,7 +546,7 @@ public class Stats extends Fragment
 				getTimeYear(weeWXAppCommon.getElement(bits, 112)),
 				weeWXAppCommon.getElement(bits, 111) + weeWXAppCommon.getElement(bits, 60)));
 
-		sb.append(createRow(weeWXAppCommon.cssToSVG("wi-raindrop"), weeWXAppCommon.cssToSVG("wi-raindrop"),
+		sb.append(createRow(weeWXAppCommon.fiToSVG("flaticon-dewpoint"), weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
 				weeWXAppCommon.getElement(bits, 124) + weeWXAppCommon.getElement(bits, 60),
 				getTimeYear(weeWXAppCommon.getElement(bits, 125)),
 				getTimeYear(weeWXAppCommon.getElement(bits, 123)),
@@ -741,7 +602,7 @@ public class Stats extends Fragment
 				getTimeSection(which, bits[start + 1]),
 				bits[start] + weeWXAppCommon.getElement(bits, 60)));
 
-		sb.append(createRow(weeWXAppCommon.cssToSVG("wi-raindrop"), weeWXAppCommon.cssToSVG("wi-raindrop"),
+		sb.append(createRow(weeWXAppCommon.fiToSVG("flaticon-dewpoint"), weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
 				bits[start + 13] + weeWXAppCommon.getElement(bits, 60),
 				getTimeSection(which, bits[start + 14]),
 				getTimeSection(which, bits[start + 12]),
@@ -794,8 +655,8 @@ public class Stats extends Fragment
 				getAllTime(weeWXAppCommon.getElement(bits, 135)),
 				weeWXAppCommon.getElement(bits, 134) + weeWXAppCommon.getElement(bits, 60)));
 
-		sb.append(createRow(weeWXAppCommon.cssToSVG("wi-raindrop"),
-				weeWXAppCommon.cssToSVG("wi-raindrop"),
+		sb.append(createRow(weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
+				weeWXAppCommon.fiToSVG("flaticon-dewpoint"),
 				weeWXAppCommon.getElement(bits, 147) + weeWXAppCommon.getElement(bits, 60),
 				getAllTime(weeWXAppCommon.getElement(bits, 148)),
 				getAllTime(weeWXAppCommon.getElement(bits, 146)),
@@ -853,8 +714,6 @@ public class Stats extends Fragment
 
 			KeyValue.putVar("LastWeatherError", null);
 
-			setZoom(currZoom, true);
-
 			stopRefreshing();
 			return;
 		}
@@ -866,8 +725,6 @@ public class Stats extends Fragment
 			wv.post(() -> wv.loadDataWithBaseURL(null,
 					weeWXApp.getAndroidString(R.string.unknown_error_occurred),
 					"text/html", "utf-8", null));
-
-			setZoom(currZoom, true);
 
 			stopRefreshing();
 			return;
@@ -882,9 +739,7 @@ public class Stats extends Fragment
 		final StringBuilder sb = new StringBuilder();
 
 		sb.append(weeWXApp.current_html_headers)
-				.append(weeWXApp.script_header)
-				.append(weeWXApp.html_header_rest)
-				.append(weeWXApp.inline_arrow);
+				.append(weeWXApp.html_header_rest);
 
 		sb.append("\n<div class='statsLayout'>\n\n");
 
@@ -956,8 +811,6 @@ public class Stats extends Fragment
 
 		wv.post(() -> wv.loadDataWithBaseURL("file:///android_asset/",
 				sb.toString(), "text/html", "utf-8", null));
-
-		setZoom(currZoom, true);
 
 		stopRefreshing();
 	}

@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
 	xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
@@ -41,6 +42,50 @@
 			    android:layout_height="match_parent" />
 		</LinearLayout>
 	</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+	<com.google.android.material.chip.ChipGroup
+		android:id="@+id/forecastIntervalGroup"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:layout_gravity="center"
+		android:layout_marginTop="4dp"
+		android:layout_marginBottom="4dp"
+		android:visibility="gone"
+		app:singleSelection="true"
+		app:selectionRequired="true"
+		app:chipSpacingHorizontal="4dp"
+		app:chipSpacingVertical="0dp">
+
+		<com.google.android.material.chip.Chip
+			android:id="@+id/chipDaily"
+			style="@style/Widget.weeWXApp.SmallChip"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/interval_daily"
+			android:checked="true" />
+
+		<com.google.android.material.chip.Chip
+			android:id="@+id/chip12h"
+			style="@style/Widget.weeWXApp.SmallChip"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/interval_12h" />
+
+		<com.google.android.material.chip.Chip
+			android:id="@+id/chip6h"
+			style="@style/Widget.weeWXApp.SmallChip"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/interval_6h" />
+
+		<com.google.android.material.chip.Chip
+			android:id="@+id/chip3h"
+			style="@style/Widget.weeWXApp.SmallChip"
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:text="@string/interval_3h" />
+
+	</com.google.android.material.chip.ChipGroup>
 
 	<FrameLayout
 		android:id="@+id/forecastFrameLayout"
