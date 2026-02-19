@@ -271,17 +271,18 @@ html, body
 }
 .statsDataRow
 {
+	font-size: 0.875rem;
 	display: grid;
 	grid-template-columns:
 	    1em
 	    5px
-	    1fr
+	    minmax(0, 3fr)
 	    5px
-	    auto
-	    15px
-	    auto
+	    minmax(0, 2fr)
+	    10px
+	    minmax(0, 2fr)
 	    5px
-	    1fr
+	    minmax(0, 3fr)
 	    5px
 	    1em;
     align-items: center;
@@ -351,17 +352,18 @@ html, body
 {
 	.statsDataRow
 	{
+        font-size: 0.875rem;
         display: grid;
         grid-template-columns:
             1em
             5px
-            1fr
+            minmax(0, 3fr)
             5px
-            auto
-            15px
-            auto
+            minmax(0, 2fr)
+            10px
+            minmax(0, 2fr)
             5px
-            1fr
+            minmax(0, 3fr)
             5px
             1em;
         align-items: center;
