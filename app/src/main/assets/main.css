@@ -275,15 +275,15 @@ html, body
 	grid-template-columns:
 	    1em
 	    5px
-	    minmax(100px, 1fr)
+	    minmax(120px, 1fr)
 	    5px
-	    minmax(48px, 1fr)
+	    minmax(40px, 1fr)
 
         minmax(5px, 1fr)
 
-	    minmax(48px, 1fr)
+	    minmax(40px, 1fr)
 	    5px
-	    minmax(100px, 1fr)
+	    minmax(120px, 1fr)
 	    5px
 	    1em;
     align-items: center;
@@ -357,15 +357,15 @@ html, body
         grid-template-columns:
             1em
             5px
-            minmax(100px, 1fr)
+            minmax(120px, 1fr)
             5px
-            minmax(48px, 1fr)
+            minmax(40px, 1fr)
 
             minmax(5px, 1fr)
 
-            minmax(48px, 1fr)
+            minmax(40px, 1fr)
             5px
-            minmax(100px, 1fr)
+            minmax(120px, 1fr)
             5px
             1em;
         align-items: center;
