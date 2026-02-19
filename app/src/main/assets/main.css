@@ -272,7 +272,6 @@ html, body
 }
 .statsDataRow
 {
-	font-size: 0.875rem;
 	display: grid;
 	grid-template-columns:
 	    1em
@@ -353,7 +352,6 @@ html, body
 {
 	.statsDataRow
 	{
-        font-size: 0.875rem;
         display: grid;
         grid-template-columns:
             1em
